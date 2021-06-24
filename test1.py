@@ -11,7 +11,6 @@ bg_file = "/home/woojac/proj/019_photobooth_flipbook/pics/bg.png"
 logo_im = cv2.imread(logo_file)
 logo_dims = logo_im.shape
 
-
 pdf_w=215.9
 pdf_h=279.4
 cam_res_x = 640
@@ -21,13 +20,17 @@ logo_res_y = logo_dims[0]
 
 select_flag = ''
 
+but_size = (18,5)
+fnt = "Ariel 32"
 gui_page1_layout = [  
-    [sg.Text('Welcome to Our Photobooth!')],
+    [sg.Text('Welcome to Our Photobooth!', font=fnt)],
     [sg.Image(filename=logo_file, key='image')], 
-    [sg.Text('What do you want to make today?')],
-    [sg.Button('Photostrip'), sg.Button('Flipbook'), sg.Button('Storybook')]
+    [sg.Text('What do you want to make today?', font=fnt)],
+    [sg.Button('Photostrip',size = but_size, font=fnt), sg.Button('Flipbook',size = but_size, font=fnt), sg.Button('Storybook',size = but_size, font=fnt)]
 ]
-gui_window = sg.Window('Erin & Jacob Photobooth', gui_page1_layout, element_justification='c')
+gui_window = sg.Window('Erin & Jacob Photobooth', gui_page1_layout, element_justification='c', resizable = True)
+gui_window.read(10)
+gui_window.maximize()
 
 # Display and interact with the Window using an Event Loop
 
@@ -183,8 +186,8 @@ if select_flag == 'PHOTOSTRIP':
     gui_photostrip_layout = [  
         [sg.Image(filename=logo_file, size=(640, 480), key='image'), sg.Column(photostrip_col)], 
         [sg.Button("Click me when you are ready!"), sg.Button("Black and White"), sg.Button("Sketch"), sg.Button("Stylize")],
-        [sg.Column([[sg.Text(size=(10,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], justification='c')],
-        [sg.Column([[sg.Text("FPS = 30  ", key="-FPS-")],], justification='r')]
+        [sg.Column([[sg.Text(size=(10,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], element_justification='c')],
+        [sg.Column([[sg.Text("FPS = 30  ", key="-FPS-")],], element_justification='r')]
     ]
     gui_window = sg.Window('Erin & Jacob Photobooth', gui_photostrip_layout, finalize=True)
 
@@ -320,8 +323,8 @@ elif select_flag == "FLIPBOOK":
     gui_flipbook_layout = [  
         [sg.Image(filename=logo_file, size=(640, 480), key='image'), sg.Column(flipbook_col)], 
         [sg.Button("Click me when you are ready!"), sg.Button("Black and White"), sg.Button("Sketch"), sg.Button("Stylize")],
-        [sg.Column([[sg.Text(size=(20,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], justification='c')],
-        [sg.Column([[sg.Text("FPS = 30  ", key="-FPS-")],], justification='r')]
+        [sg.Column([[sg.Text(size=(20,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], element_justification='c')],
+        [sg.Column([[sg.Text("FPS = 30  ", key="-FPS-")],], element_justification='r')]
     ]
 
 
@@ -457,8 +460,8 @@ elif select_flag == 'STORYBOOK':
     gui_storybook_layout = [  
         [sg.Image(filename=logo_file, size=(640, 480), key='image'), sg.Column(storybook_col)], 
         [sg.Button("Click me to take the picture!"), sg.Button("Black and White"), sg.Button("Sketch"), sg.Button("Stylize")],
-        [sg.Column([[sg.Text(size=(20,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], justification='c')],
-        [sg.Column([[sg.Text("  FPS = 30", key="-FPS-")],], justification='r')]
+        [sg.Column([[sg.Text(size=(20,1), font=('Helvetica', 100), justification='c', key='-TTT-')],], element_justification='c')],
+        [sg.Column([[sg.Text("  FPS = 30", key="-FPS-")],], element_justification='r')]
     ]
 
     gui_window = sg.Window('Erin & Jacob Photobooth', gui_storybook_layout, finalize=True)

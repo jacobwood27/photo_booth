@@ -6,10 +6,15 @@
         "imencode",
         "imread",
         "imshow",
+        "imutils",
+        "numpy",
         "photo",
         "popen",
         "strip",
+        "targ",
+        "thet",
         "tobytes",
+        "unpaddable",
         "woojac"
     ]
 }

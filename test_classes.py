@@ -58,22 +58,29 @@ HIGH_SCORE_HOLDER = None
 
 
 class ToggleButton(sg.Button):
-    color_off = BUTTON_COLOR_OFF
-    color_on = BUTTON_COLOR_ON
-    def __init__(self, text, size, font, key, state=False):
+
+    def __init__(self, text, size, font, key, toggle_text=None, default_color=BUTTON_COLOR_OFF, toggle_color=BUTTON_COLOR_ON, state=False):
+        self.color_off = default_color
+        self.color_on = toggle_color
+        self.text_off = text
+        self.text_on = toggle_text
         if state:
             col = self.color_on
+            txt = self.text_on
         else:
             col = self.color_off
-        super().__init__(text, size=size, font=font, key=key, button_color=col)
+            txt = self.text_off
+        super().__init__(txt, size=size, font=font, key=key, button_color=col)
         self.state = state
         self.key = key
     def toggle(self, gui):
         gui[self.key].state = not gui[self.key].state 
         if gui[self.key].state:
-            gui[self.key].Update(button_color=BUTTON_COLOR_ON)
+            gui[self.key].Update(button_color=self.color_on)
+            gui[self.key].Update(text=self.text_on)
         else:
-            gui[self.key].Update(button_color=BUTTON_COLOR_OFF)
+            gui[self.key].Update(button_color=self.color_off)
+            gui[self.key].Update(text=self.text_off)
 
 def get_landing_layout():
 
@@ -87,7 +94,7 @@ def get_landing_layout():
     score_col = sg.Column([[sg.Text("Score", font=fnt, key='HIGH_SCORE_KEY', justification='r')],
                            [sg.Text("Score", font=fnt, key='CUR_SCORE_KEY',  justification='r')]], background_color='red', justification='r')
     layout = [  
-        [sg.Text('Welcome to Our Photobooth!', font=fnt), score_col],
+        [sg.Text('Welcome to Our Photobooth!', font=fnt)],
         [sg.Image(filename=PICTURES['cam_dummy'], key="landing_im")], 
         [sg.Text('What do you want to make today?', font=fnt)],
         [sg.Button(t, size = but_size, font=fnt) for t in opts]
@@ -116,6 +123,20 @@ def get_photostrip_layout():
                     element_justification='c', pad=(0,0)), #background_color='blue'
         sg.Column(  photostrip_col, 
                     pad=(0,0), element_justification='c', justification='r') #, background_color='red')
+        ]]
+
+    return layout
+
+
+def get_video_layout():
+    big_but_size = (25,3)
+    big_fnt_size = 30
+    big_fnt = (FONT, big_fnt_size)
+
+    layout = [[
+        sg.Column(  [[sg.Image(filename=PICTURES['cam_dummy'], size=(1280, 720), key='video_im_main')], 
+                    [ToggleButton("  Record  ", big_but_size, big_fnt, toggle_text="Recording...", default_color = ("white", "black"), toggle_color=("white", "red"), key="video_record")],], 
+                    element_justification='c', pad=(0,0)), #background_color='blue'
         ]]
 
     return layout
@@ -241,7 +262,6 @@ class FlyingHead:
         dX = Xt - Xi
         dY = Yt - Yi
 
-        
         v = np.math.sqrt(0.5*a*dX**2/(np.math.cos(Ai)**2)/(dY + dX*np.math.tan(Ai)))
         
         self.X = Xi
@@ -318,7 +338,7 @@ def run_landing(gui):
 
     cap = cv2.VideoCapture(CAMERA_STREAM)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    tt = 5
+    tth = 10
     t_start = time.time()
 
     track_list = []
@@ -326,9 +346,7 @@ def run_landing(gui):
     last_time = time.time()
 
     head_size_min = 30
-    head_size_max = 50
-
-    score = 0
+    head_size_max = 60
 
     with mp_face_detection.FaceDetection(min_detection_confidence=0.5) as face_detection:
 
@@ -390,8 +408,8 @@ def run_landing(gui):
                     if cheat:
                         mp_drawing.draw_detection(frame, detection)
                         cv2.circle(frame, best_track.c_c, round(best_track.c_rad), (255,0,0)) 
-                        lx = round(best_track.X + best_track.c_rad*np.cos(best_track.c_rot))
-                        ly = round(best_track.Y + best_track.c_rad*np.sin(best_track.c_rot))
+                        lx = int(round(best_track.X + best_track.c_rad*np.cos(best_track.c_rot)))
+                        ly = int(round(best_track.Y + best_track.c_rad*np.sin(best_track.c_rot)))
                         cv2.circle(frame, (lx, ly), 8, (255,0,0), -1) 
                 
                 p_spawn = 0.1
@@ -433,14 +451,14 @@ def run_landing(gui):
                 if cheat:
                     cv2.circle(frame, head.pos(), round(head.dia/2), (255,0,255)) 
 
-            print(points)
+            # print(points)
 
             for track in track_list:
                 if not track.live:
                     track_list.remove(track)
                     
 
-            gui['landing_im'].update(data=cv2.imencode('.png', cv2.resize(frame,(2*640, 2*480)))[1].tobytes())  # Update image in window
+            gui['landing_im'].update(data=cv2.imencode('.png', cv2.resize(frame,(640, 480)))[1].tobytes())  # Update image in window
 
             if event != "__TIMEOUT__":
                 break
@@ -491,18 +509,61 @@ def run_photostrip(gui, dir):
     gui['PHOTOSTRIP_LAYOUT'].update(visible=False)
     
 
+
+def run_video(gui, dir):
+    gui['VIDEO_LAYOUT'].update(visible=True)
+    
+    cap = cv2.VideoCapture(CAMERA_STREAM)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
+    cap.set(cv2.CAP_PROP_FPS, 30.0)
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+    # out = cv2.VideoWriter("out.avi", cv2.VideoWriter_fourcc(*'MP42'), 30, (640, 480))
+    out = cv2.VideoWriter("out.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 30, (1280, 720))
+
+    recording_flag = False
+
+    while True:
+        event, values = gui.read(10)
+        
+        ret,frame = cap.read()
+        frame = cv2.flip(frame, 1)
+
+        # gui['video_im_main'].update(data=cv2.imencode('.png', frame)[1].tobytes())  # Update image in window
+
+        if recording_flag:
+            out.write(frame)
+
+        if event == sg.WINDOW_CLOSED:
+            break
+        elif event == "video_record" and not recording_flag:
+            gui["video_record"].update(text="Recording...", button_color=("white","red"))
+            recording_flag = True
+        elif event == "video_record" and recording_flag:
+            break
+    
+    out.release()
+    cap.release()
+    gui['VIDEO_LAYOUT'].update(visible=False)
+
+
 def run_photobooth():
 
     # Need to put all the layouts upfront and put them on the gui (hidden)
     LAYOUT_LIST = [
         ('LANDING_LAYOUT',    get_landing_layout()),
         ('PHOTOSTRIP_LAYOUT', get_photostrip_layout()),
+        ('VIDEO_LAYOUT',      get_video_layout())
         ]
 
     DISPATCH_DICT = {
         'LANDING'    : run_landing,
         'PHOTOSTRIP' : run_photostrip,
-    }
+        'VIDEO'      : run_video,
+        }
 
     # Then make the window and get it spooled up
     gui = open_gui(LAYOUT_LIST)

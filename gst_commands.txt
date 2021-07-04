@@ -1,0 +1,45 @@
+gst-launch-1.0 -v v4l2src device=/dev/video0 num-buffers=300 ! "video/x-raw, width=1920,height=1080,framerate=30/1" ! videorate ! "video/x-raw,framerate=30/1" ! tee name=a ! queue ! jpegenc ! avimux ! filesink location=output.avi a. ! queue ! fpsdisplaysink
+
+gst-launch-1.0 -v  v4l2src device=/dev/video0 ! capsfilter caps="video/x-raw, width=1920,height=1080,framerate=30/1" ! videoflip method=rotate-180 ! videoconvert ! videorate ! x264enc! avimux ! filesink location=test_video.h264
+
+
+gst-launch-1.0 v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video20 t. ! queue ! avimux ! filesink location=test.avi
+
+ queue ! avimux ! filesink location=test.avi
+
+
+ gst-launch-1.0 -e v4l2src device="/dev/video0" ! videoconvert ! queue ! x264enc tune=zerolatency ! mux. alsasrc device="hw:2" ! queue ! audioconvert ! audioresample ! voaacenc ! aacparse ! qtmux name=mux ! filesink location=test.mp4 sync=false
+
+gst-launch-1.0 -e autovideosrc ! queue ! videoconvert ! mkv. autoaudiosrc ! queue ! audioconvert ! mkv. matroskamux name=mkv ! filesink location=test.mkv sync=false
+
+! audioconvert !
+audio/x-raw, layout=non-interleaved ! webrtcdsp noise-suppression-level=high
+echo-suppression-level=high ! audioconvert ! webrtcechoprobe ! audioconvert
+
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video2 t. ! queue ! mkv. alsasrc ! queue ! mkv. matroskamux name=mkv ! filesink location=test.mkv
+
+
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video2 t. ! queue ! mkv. alsasrc ! audioconvert ! audio/x-raw, layout=non-interleaved ! webrtcdsp noise-suppression-level=low ! audioconvert ! webrtcechoprobe ! audioconvert ! mkv. matroskamux name=mkv ! filesink location=test.mkv
+
+gst-launch-1.0 -v v4l2src device=/dev/video0  ! avdec_mjpeg ! videoconvert ! video/x-raw,format=RGB,width=1920,height=1080,framerate=30/1 ! xvimagesink sync=0
+
+gst-launch-1.0 -v v4l2src device=/dev/video0 ! video/x-raw, format=YUY2, width=1920, height=1080, framerate=30/1 ! jpegenc ! rtpjpegpay ! udpsink host=127.0.0.1 port=5000
+
+gst-launch-1.0 -v udpsrc port=5000 ! application/x-rtp, media=video, clock-rate=90000, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! xvimagesink sync=0
+
+
+gst-launch-1.0 -v v4l2src device=/dev/video0 io-mode=2 ! image/jpeg, width=1920, height=1080, framerate=30/1 ! v4l2decoder mjpeg=1 ! vidconv ! video/x-raw,format=BGRx ! videoconvert ! video/x-raw, format=BGR ! xvimagesink sync=0
+
+gst-launch-1.0 -v v4l2src device=/dev/video0 io-mode=2 ! image/jpeg, width=1920, height=1080 ! jpegdec ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! v4l2sink device=/dev/video2 
+
+
+
+
+
+
+
+#Winner?
+#preview
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! queue ! v4l2sink device=/dev/video2 
+#record
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video2 t. ! queue ! mkv. alsasrc ! queue ! mkv. matroskamux name=mkv ! filesink location=test.mkv

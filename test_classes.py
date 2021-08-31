@@ -8,6 +8,15 @@ import numpy as np
 import imutils
 import random
 import subprocess
+import signal
+from gphotospy import authorize
+from gphotospy.album import Album
+from gphotospy.media import Media
+
+import pyqrcode
+import png
+
+## sudo modprobe v4l2loopback
 
 # Define some constants
 PICTURES = {
@@ -37,10 +46,13 @@ SCREEN_Y = 1200     #pix, vertical resolution of screen
 UNPADDABLE = 7      #pix, remaining unpaddable pixels on edge of screen
 FONT     = "Ariel"  #font for all the gui stuff
 
+# Select secrets file (got through Google's API console)
+CLIENT_SECRET_FILE = "/home/jwood/google_api_credentials.json" # Here your secret's file. See below.
+
 BUTTON_COLOR_OFF = ("white", "grey")
 BUTTON_COLOR_ON = ("white", "green")
 
-CAMERA_STREAM = "/dev/video1"
+CAMERA_STREAM = "/dev/video0"
 
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
@@ -54,6 +66,15 @@ HIGH_SCORE_HOLDER = None
 #         self.im = cv2.imread(filename)
 #         self.x = self.im.shape[1]
 #         self.y = self.im.shape[2]
+
+# Get authorization and return a service object
+service = authorize.init(CLIENT_SECRET_FILE)
+
+# Init the album+media managers
+ALBUM_MANAGER = Album(service)
+MEDIA_MANAGER = Media(service)
+
+
 
 
 class ToggleButton(sg.Button):
@@ -478,31 +499,22 @@ def run_photostrip(gui, dir):
     cap = cv2.VideoCapture(CAMERA_STREAM)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-    with mp_face_detection.FaceDetection(min_detection_confidence=0.5) as face_detection:
+    while True:
+        event, values = gui.read(25)
+        
+        ret,frame = cap.read()
+        frame = cv2.flip(frame, 1)
 
-        while True:
-            event, values = gui.read(25)
-            
-            ret,frame = cap.read()
-            frame = cv2.flip(frame, 1)
+        gui['strip_im_main'].update(data=cv2.imencode('.png', cv2.resize(frame,(2*640, 2*480)))[1].tobytes())  # Update image in window
 
-            image = cv2.cvtColor(cv2.resize(frame, (0,0), fx=1, fy=1), cv2.COLOR_BGR2RGB)
-            image.flags.writeable = False
-            results = face_detection.process(image)
-            if results.detections:
-                for detection in results.detections:
-                    mp_drawing.draw_detection(frame, detection)
-
-            gui['strip_im_main'].update(data=cv2.imencode('.png', cv2.resize(frame,(2*640, 2*480)))[1].tobytes())  # Update image in window
-
-            if event == sg.WINDOW_CLOSED:
-                break
-            elif event == "ps_bw":
-                gui["ps_bw"].toggle(gui)
-            elif event == "ps_k":
-                gui["ps_k"].toggle(gui)
-            elif event == "ps_y":
-                gui["ps_y"].toggle(gui)
+        if event == sg.WINDOW_CLOSED:
+            break
+        elif event == "ps_bw":
+            gui["ps_bw"].toggle(gui)
+        elif event == "ps_k":
+            gui["ps_k"].toggle(gui)
+        elif event == "ps_y":
+            gui["ps_y"].toggle(gui)
             
     cap.release()
     gui['PHOTOSTRIP_LAYOUT'].update(visible=False)
@@ -511,29 +523,21 @@ def run_photostrip(gui, dir):
 
 def run_video(gui, dir):
     gui['VIDEO_LAYOUT'].update(visible=True)
+
+    video_file = dir + "/raw.mp4"
+
+    cmd_preview = "gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert ! tee name=t t. ! queue  ! videoscale ! 'video/x-raw,width=960,height=540' !  v4l2sink device=/dev/video3 sync=false t. ! queue  !  v4l2sink device=/dev/video4 sync=false"
+    cmd_record  = "gst-launch-1.0 -e v4l2src device=/dev/video4 ! x264enc tune=zerolatency ! mp4mux name=mux  ! filesink location='" + video_file + "' sync=false alsasrc ! lamemp3enc ! queue ! mux."
     
-    cmd_preview = "gst-launch-1.0 -e v4l2src device=/dev/video1 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! queue ! v4l2sink device=/dev/video2"
-    cmd_record = "gst-launch-1.0 -e v4l2src device=/dev/video1 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video2 t. ! queue ! mkv. alsasrc ! queue ! mkv. matroskamux name=mkv ! filesink location=test.mkv"
-
     p_preview = subprocess.Popen("exec " + cmd_preview, stdout=subprocess.PIPE, shell=True)
-    time.sleep(1)
+    time.sleep(1.0)
 
-    cap = cv2.VideoCapture("/dev/video2", cv2.CAP_V4L2)
+    cap = cv2.VideoCapture("/dev/video3", cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 108
-    0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 960)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 540)
     cap.set(cv2.CAP_PROP_FPS, 30.0)
-
-    # cap.set(cv2.CAP_PROP_FPS, 30.0)
-    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
-    # out = cv2.VideoWriter("out.avi", cv2.VideoWriter_fourcc(*'MP42'), 30, (640, 480))
-    # out = cv2.VideoWriter("out.mp4", cv2.VideoWriter_fourcc(*'mp4v'), 30, (1280, 720))
 
     recording_flag = False
 
@@ -541,9 +545,9 @@ def run_video(gui, dir):
         event, values = gui.read(10)
         
         ret,frame = cap.read()
-        frame = cv2.flip(frame, 1)
-
-        gui['video_im_main'].update(data=cv2.imencode('.png', frame)[1].tobytes())  # Update image in window
+        if ret:
+            frame = cv2.flip(frame, 1)
+            gui['video_im_main'].update(data=cv2.imencode('.png', frame)[1].tobytes())  # Update image in window
 
         if recording_flag:
             # out.write(frame)
@@ -552,17 +556,41 @@ def run_video(gui, dir):
         if event == sg.WINDOW_CLOSED:
             break
         elif event == "video_record" and not recording_flag:
-            p_preview.kill()
-            time.sleep(0.1)
             p_record = subprocess.Popen("exec " + cmd_record, stdout=subprocess.PIPE, shell=True)
             gui["video_record"].update(text="Recording...", button_color=("white","red"))
             recording_flag = True
         elif event == "video_record" and recording_flag:
+            p_record.send_signal(signal.SIGINT) 
+            time.sleep(0.3)
+            p_preview.kill()
             p_record.kill()
+            time.sleep(3)
             break
     
     # out.release()
     cap.release()
+
+    # Create a new album
+    print("Creating Album")
+    new_album = ALBUM_MANAGER.create(dir[7:])
+
+    # Get the album id and share it
+    id_album = new_album.get("id")
+    share_results = ALBUM_MANAGER.share(id_album)
+    shareUrl = share_results["shareableUrl"]
+    qr = pyqrcode.create(shareUrl)
+    qr.png(dir + "/myqr.png", scale = 6)
+
+    print("Staging Media")
+    ret = MEDIA_MANAGER.stage_media(video_file)
+    print(ret)
+
+    print("Batch Create")
+    ret = MEDIA_MANAGER.batchCreate(album_id=id_album)
+    print(ret)
+
+   
+
     gui['VIDEO_LAYOUT'].update(visible=False)
 
 
@@ -585,11 +613,11 @@ def run_photobooth():
     gui = open_gui(LAYOUT_LIST)
 
     # Now we run the landing page
-    # selection, out_dir = DISPATCH_DICT['LANDING'](gui)
+    selection, out_dir = DISPATCH_DICT['LANDING'](gui)
 
     # Now dispatch on the selection
-    DISPATCH_DICT['VIDEO'](gui,"output/test1")
-    # DISPATCH_DICT[selection](gui, out_dir)
+    # DISPATCH_DICT['VIDEO'](gui,"output/test1")
+    DISPATCH_DICT[selection](gui, out_dir)
     
 
 run_photobooth()

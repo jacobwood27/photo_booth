@@ -33,13 +33,42 @@ gst-launch-1.0 -v v4l2src device=/dev/video0 io-mode=2 ! image/jpeg, width=1920,
 gst-launch-1.0 -v v4l2src device=/dev/video0 io-mode=2 ! image/jpeg, width=1920, height=1080 ! jpegdec ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! v4l2sink device=/dev/video2 
 
 
+gst-launch-1.0 v4l2src device=/dev/video0 ! "image/jpeg,width=1920,height=1080" ! jpegdec ! queue ! v4l2sink device=/dev/video3
 
 
 
 
+Preview
+gst-launch-1.0 v4l2src device=/dev/video0 do-timestamp=true ! "image/jpeg,width=1920,height=1080" ! jpegdec ! queue ! videoconvert !  v4l2sink device=/dev/video3
+
+Record
+gst-launch-1.0 v4l2src device=/dev/video0 do-timestamp=true ! "image/jpeg,width=1920,height=1080" ! tee name=t ! jpegdec ! queue ! videoconvert !  v4l2sink device=/dev/video3 t. ! queue ! mkv. alsasrc ! mkv. x265enc ! queue ! mkv. matroskamux name=mkv ! filesink location=test.mkv
+
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! tee name=t t. ! queue ! xvimagesink sync=false t. ! queue ! videoconvert ! x265enc tune=zerolatency ! h265parse ! matroskamux ! filesink location='raw_dual.mkv' 
 
 #Winner?
 #preview
 gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! queue ! v4l2sink device=/dev/video2 
 #record
 gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! tee name=t ! queue ! v4l2sink device=/dev/video2 t. ! queue ! mkv. alsasrc ! queue ! mkv. matroskamux name=mkv ! filesink location=test.mkv
+
+
+
+
+#WINNER RECORDING
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert ! tee name=t t. ! queue  ! videoscale ! 'video/x-raw,width=960,height=540' !  v4l2sink device=/dev/video3 sync=false t. ! queue  ! x264enc tune=zerolatency ! h264parse ! matroskamux name=mux  ! filesink location='raw_dual.mkv' sync=false alsasrc ! queue ! mux.
+
+#WINNER PREVIEW
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert ! videoscale ! 'video/x-raw,width=960,height=540' ! tee name=t t. ! queue ! v4l2sink device=/dev/video3 sync=false t. ! queue  ! fakesink
+
+
+
+
+
+
+#Double split
+#MAke streams
+gst-launch-1.0 -e v4l2src device=/dev/video0 do-timestamp=true ! image/jpeg,width=1920,height=1080,framerate=30/1 ! jpegdec ! videoconvert ! tee name=t t. ! queue  ! videoscale ! 'video/x-raw,width=960,height=540' !  v4l2sink device=/dev/video3 sync=false t. ! queue  !  v4l2sink device=/dev/video4 sync=false
+
+#Hook in recorder
+gst-launch-1.0 -e v4l2src device=/dev/video4 ! x264enc tune=zerolatency ! mp4mux name=mux  ! filesink location='raw_dual.mp4' sync=false alsasrc ! lamemp3enc ! queue ! mux.
